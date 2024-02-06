@@ -1,47 +1,35 @@
 1;
 
+## ## Stationary solver
+##
+## Solve 
+##
+## $$ - \nu\ (\partial_{xx} u_x + \partial_{yy} u_x) + u_x\ \partial_x u_x + u_y\ \partial_y u_x + \partial_x\ p = f_x $$
+##
+## $$ - \nu\ (\partial_{xx} u_y + \partial_{yy} u_y) + u_x\ \partial_{x} u_y + u_y\ \partial_{y} u_y + \partial_{y}\ p  = f_y $$
+##
+## constrained by
+##
+## $$ \partial_{x} u_x + \partial_{y} u_y = 0. $$
+##
+## Initialize by solving the Stokes problem
+##
+## $$ - \nu\ (\partial_{xx} u_x + \partial_{yy} u_x) + \partial_x\ p    = f_x $$
+##
+## $$ - \nu\ (\partial_{xx} u_y + \partial_{yy} u_y) + \partial_{y}\ p  = f_y $$
+##
+## constrained by
+##
+## $$ \partial_{x} u_x + \partial_{y} u_y = 0. $$
+##
+## Then perform fiexed-point iterations
+##
+## $$ - \nu\ (\partial_{xx} u_x^{(k+1)} + \partial_{yy} u_x^{(k+1)}) + u_x^{(k)}\ \partial_x u_x^{(k)}  + u_y^{(k)}\ \partial_y u_x^{(k)} + \partial_x\ p^{(k+1)} = f_x $$
+##
+## $$ - \nu\ (\partial_{xx} u_y^{(k+1)} + \partial_{yy} u_y^{(k+1)}) + u_x^{(k)}\ \partial_{x} u_y^{(k)} + u_y^{(k)}\ \partial_{y} u_y^{(k)} + \partial_{y}\ p^{(k+1)}  = f_y $$
+##
+## $$ \partial_{x} u_x^{(k+1)} + \partial_{y} u_y^{(k+1)} = 0. $$
 
-%{
-
-solve 
-
-  dt(ux) - nu (dxx(ux)+dyy(ux)) + ux dx(ux) + uy dy(ux) + dx(p) = fx
-  dt(uy) - nu (dyy(uy)+dyy(uy)) + ux dx(uy) + uy dy(uy) + dy(p) = fy
-  dx(ux) + dy(uy) = 0
-
-upon (semi-implicit) time discretization
-
-  ux - tau (nu (dxx(ux)+dyy(ux)) - dx(p)) = ux0 + tau (fx - ux0 dx(ux0) - uy0 dy(ux0))
-  uy - tau (nu (dyy(uy)+dyy(uy)) - dy(p)) = uy0 + tau (fy - ux0 dx(uy0) - uy0 dy(uy0))
-            dx(ux) + dy(uy) = 0
-
-in matrix form
-
-  M ux + tau A ux + tau Bx' p = M ux0 + tau (fx - C(ux0,uy0) ux0)
-  M uy + tau A uy + tau By' p = M uy0 + tau (fy - C(ux0,uy0) uy0)
-         tau Bx ux            = 0
-         tau By uy            = 0
-
-or 
-
-  [(M+tau A), 0        , (tau Bx')] [ux]    [ M ux0 + tau FX(ux0,uy0) ]
-  [0        , (M+tau A), (tau By')] [uy]  = [ M uy0 + tau FY(ux0,uy0) ]
-  [(tau Bx) , (tau By) , 0        ] [p ]    [ 0                       ]
-
-
-%}
-
-%{
-
-explicit 2-step time discretization
-
-A+M v + B' p = F(v0)
-  B v        = 0
-
-(B * (A+M)^-1 * B') p = B * ((A+M)^-1 * F(v0)) 
-(A+M) v = (F(v0) -B' p)
-
-%}
 
 
 function ii = rc2i (r, c, nrows, ncols=c)
