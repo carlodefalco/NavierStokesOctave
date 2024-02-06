@@ -1,4 +1,5 @@
-1;
+close all
+clear all
 
 ## ## Stationary solver
 ##
@@ -369,7 +370,7 @@ surf (X, Y, reshape (U, size (X)))
 
 
 ndof_p = nr*nc*3;
-nu  = .01;
+nu  = 1/32;
 LHS = [nu*A       0*A      -Bx;
        0*A        nu*A     -By;
        -Bx.'      -By.'     sparse(columns(Bx), columns(Bx))];
