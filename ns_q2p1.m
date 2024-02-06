@@ -338,6 +338,7 @@ function C = op_u0_gradu (hx, hy, numrows, numcols, ux0, uy0, u)
   endfor
 endfunction
 
+## Example problem, see https://doi.org/10.1002/fld.2337 for solutions (without convection)
 
 nr = 25;
 nc = 25;
@@ -355,19 +356,6 @@ dnodes = find ((X(:) <= eps) ...
 	       | (X(:) >= (1)*(1-eps)) ...
 	       | (Y(:) <= eps) ...
 	       | (Y(:) >= (3)*(1-eps)));
-
-%{
-U = zeros (ndof_ux, 1);
-U(Y(:) >= (1)*(1-eps)) = 1;
-F = ones (ndof_ux, 1);
-inodes = setdiff (1:ndof_ux, dnodes);
-
-U(inodes) = A(inodes, inodes) \ ((M*F)(inodes) -A(inodes, dnodes) * U(dnodes));
-
-figure (1)
-surf (X, Y, reshape (U, size (X)))
-%}
-
 
 ndof_p = nr*nc*3;
 nu  = 1/32;
@@ -397,6 +385,8 @@ streamline (X, Y, reshape (U, size (X)), reshape (V, size (X)), linspace(0, 1, 1
 hold all
 quiver (X, Y, reshape (U, size (X)), reshape (V, size (X)));
 axis image
+
+## Now enable convection and perform fixed point iterations
 
 Cx = op_u0_gradu (hx, hy, nr, nc, U, V, U);
 Cy = op_u0_gradu (hx, hy, nr, nc, U, V, V);
