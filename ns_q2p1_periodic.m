@@ -1,5 +1,3 @@
-clear all close all
-
 ## ## Transient solver, rectangular domain with cylinder
 ##
 ## Solve 
@@ -34,15 +32,14 @@ clear all close all
 
 ## Example problem, flow past cylinder
 
-nr = 20;
-nc = 60;
+nr = 32;
+nc = 32;
 
-L =  3;
-H =  1;
+L =  32;
+H =  32;
 hx = L / nc;
 hy = H / nr;
 
-r =  L/10;
 
 A  = op_gradu_gradv (nr, nc);
 M  = op_u_v (hx, hy, nr, nc);
@@ -51,52 +48,57 @@ By = op_dudy_p (hx, hy, nr, nc);
  
 [X, Y] = meshgrid (linspace (0, L, 2*nc+1), linspace (0, H, 2*nr+1));
 ndof_ux = ndof_uy = numel (X);
-dnodesu = find ((X(:) <= eps) ...
-		| ( ((X(:)-L/3).^2 + Y(:).^2) <= r^2));
 
-inodesu = setdiff (1:ndof_ux, dnodesu);
 
-dnodesv = ndof_ux + find ((Y(:) <= eps) ...
-			  | (Y(:) >= (H)*(1-eps)) ...
-			  | ( ((X(:)-L/3).^2 + Y(:).^2) <= r^2));
-inodesv = setdiff (1:ndof_uy, dnodesv);
+## FIXME : periodic boundary conditions are currently broken ...
+mnodesx = find ((X(:) <= eps));
+snodesx = find (abs (X(:)-L) <= eps(L));
+
+[~, jj] = sort(Y(:)(mnodesx));
+mnodesx = mnodesx(jj);
+[~, jj] = sort(Y(:)(snodesx));
+snodesx = snodesx(jj);
+
+mnodesy = find ((Y(:) <= eps));
+snodesy = find (abs (Y(:)-H) <= eps(H));
+
+[~, jj] = sort(X(:)(mnodesy));
+mnodesy = mnodesy(jj);
+[~, jj] = sort(X(:)(snodesy));
+snodesy = snodesy(jj);
+
+mnodesu = [mnodesx(:); mnodesy(:)];
+mnodesv = mnodesu + ndof_ux;
+
+snodesu = [snodesx(:); snodesy];
+snodesv = snodesu + ndof_uy;
+
+unodesu = setdiff (1:ndof_ux, snodesu);
+unodesv = setdiff ((1:ndof_uy)+ndof_ux, snodesv);
+
+unodes = union (unodesu, unodesv);
 
 ndof_p = nr*nc*3;
-nu  =  1/60.;
+nu     = 1;
 
 
-LHS = [nu*A                               sparse(rows(A), columns(A))      -Bx;
-       sparse(rows(A), columns(A))        nu*A                             -By;
-       -Bx.'                              -By.'                 sparse(columns(Bx), columns(Bx))];
-
-dnodes_stokes = union (dnodesu, dnodesv);
-inodes_stokes = setdiff (1:(ndof_ux+ndof_uy+ndof_p), dnodes_stokes);
-
-U = zeros (ndof_ux, 1);
-U(X(:) <= eps)    = 1;
-V = zeros (ndof_uy, 1);
+U = .1 * cos (2*pi* .5 * Y/H)(:);
+V = 0  * cos (2*pi* 2 * X/L)(:);
 p = zeros (ndof_p,  1);
 
-SOL= [U;V;p];
-RHS = zeros (ndof_ux+ndof_uy+ndof_p, 1);
-
-warning ('off', 'Octave:singular-matrix')
-SOL(inodes_stokes) = LHS(inodes_stokes, inodes_stokes) \ (RHS(inodes_stokes) - LHS(inodes_stokes, dnodes_stokes) * SOL(dnodes_stokes));
-U = SOL (1 : ndof_ux);
-V = SOL ((1 : ndof_uy) + ndof_ux);
-p = SOL ((1 : ndof_p) + ndof_ux  + ndof_uy);
-
-## figure (1)
-## streamline (X, Y, reshape (U, size (X)), reshape (V, size (X)), [linspace(0, L, 10), linspace(L, 0, 10)], [linspace(0, H, 10), linspace(0, H, 10)]);
-## hold all
-## quiver (X, Y, reshape (U, size (X)), reshape (V, size (X)));
-## axis image
-
-## Now enable convection and perform time iterations
 dt  = .01 * L/nc/norm (U(:), inf)
 LHS = [(1/dt)*M+nu*A                      sparse(rows(A), columns(A))      -Bx;
        sparse(rows(A), columns(A))        (1/dt)*M+nu*A                    -By;
        -Bx.'                              -By.'                             sparse(columns(Bx), columns(Bx))];
+
+LHS(mnodesu, :) += LHS(snodesu, :);
+LHS(:, mnodesu) += LHS(:, snodesu);
+
+LHS(mnodesv, :) += LHS(snodesv, :);
+LHS(:, mnodesv) += LHS(:, snodesv);
+
+RHS = zeros (ndof_ux+ndof_uy+ndof_p, 1);
+SOL = zeros (ndof_ux+ndof_uy+ndof_p, 1);
 
 ##figure (2)
 ii = 0;
@@ -107,21 +109,26 @@ for kk = 1 : ceil (L/dt)
 
   RHS(1:ndof_ux) = -Cx+(1/dt)*M*U;
   RHS((1:ndof_uy)+ndof_ux) = -Cy+(1/dt)*M*V;
-
-  SOL(inodes_stokes) = (LHS(inodes_stokes, inodes_stokes) \ (RHS(inodes_stokes) - LHS(inodes_stokes, dnodes_stokes) * SOL(dnodes_stokes)));
+  RHS(mnodesu) += RHS(snodesu);
+  RHS(mnodesv) += RHS(snodesv);
+  
+  SOL(unodes)  = LHS(unodes, unodes) \ RHS(unodes);
+  SOL(snodesu) = SOL(mnodesu);
+  SOL(snodesv) = SOL(mnodesv);
+  
   U = SOL (1 : ndof_ux);
   V = SOL ((1 : ndof_uy) + ndof_ux);
   p = SOL ((1 : ndof_p) + ndof_ux  + ndof_uy);
   toc ()
 
-  if (mod (kk, 50) == 0)
+  if (mod (kk, 2) == 0)
     hold off
     figure (2)
-    pcolor (X, Y, reshape (U, size (X)))
-    colorbar ('ylabel', 'horizontal velocity')
+    pcolor (X, Y, reshape (sqrt (U.^2 + V.^2), size (X)))
+    colorbar ('ylabel', 'velocity magnitude')
     hold all
-    hax1 = streamline (X, Y, reshape (U, size (X)), reshape (V, size (X)), ones(1, 20), linspace(0, H, 20), [ 1, 150]);
-    hax2 = streamline (X, Y, reshape (U, size (X)), reshape (V, size (X)), ones(1, 20), linspace(0, H, 20), [-1, 50]);
+    hax1 = streamline (X, Y, reshape (U, size (X)), reshape (V, size (X)), X(1:5:end,1:5:end)(:), Y(1:5:end,1:5:end)(:), [  1, 50]);
+    hax2 = streamline (X, Y, reshape (U, size (X)), reshape (V, size (X)), X(1:5:end,1:5:end)(:), Y(1:5:end,1:5:end)(:), [ -1, 50]);
     %%quiver (X, Y, reshape (U, size (X)), reshape (V, size (X)));
     axis image
     title (sprintf ("iteration %d", kk))
